@@ -10,8 +10,8 @@ from torch.utils.data import DataLoader, Dataset
 # from torch.utils.data.distributed import DistributedSampler
 import random
 # from utils.util_image import *
-import config
-from patient import Patient # use this import if running placenta_us_dataset.py
+import config # use this import if running placenta_us_dataset.py
+from patient import Patient
 # from dataset.patient import Patient # use this import if running main.py
 # import dataset.config as config
 

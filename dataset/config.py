@@ -1,0 +1,2 @@
+FGR_PATH = 'C:\\Users\\DRACula\\Box\\In Utero Wellcome Leap Project\\FGR Study Ultrasound Data\\Placenta Data\\Analysis\\FGR_Patients_Segmented'
+CONTROLLED_PATH = 'C:\\Users\\DRACula\\Box\\In Utero Wellcome Leap Project\\FGR Study Ultrasound Data\\Placenta Data\\Analysis\\Control_Patients_Segmented'

@@ -6,14 +6,15 @@ import pydicom
 import os
 import SimpleITK as sitk
 import torch
+import cv2
 from torch.utils.data import DataLoader, Dataset
 # from torch.utils.data.distributed import DistributedSampler
 import random
 # from utils.util_image import *
-import config # use this import if running placenta_us_dataset.py
-from patient import Patient
-# from dataset.patient import Patient # use this import if running main.py
-# import dataset.config as config
+# import config # use this import if running placenta_us_dataset.py
+# from patient import Patient
+from dataset.patient import Patient # use this import if running main.py
+import dataset.config as config
 
 
 PATIENT2FILE_MAP = {}
@@ -138,8 +139,11 @@ class Dataset:
         # index_subject, index_z = self.indexes_map[item]
         index_subject = self.data_input[item]
         img_input = read_dicom_image(index_subject)
+        img_input = cv2.cvtColor(img_input, cv2.COLOR_BGR2GRAY)
+        img_input = img_input.reshape(1, img_input.shape[0], img_input.shape[1])
         index_subject_label = self.data_labels[item]
         img_label = read_mha_image(index_subject_label)
+        img_label = img_label.reshape(1, img_label.shape[0], img_label.shape[1])
 
         # img_input = np.expand_dims(center_crop(img_input, [248, 248]), axis=0)
         # img_label = np.expand_dims(center_crop(img_label, [248, 248]), axis=0)
@@ -218,7 +222,8 @@ if __name__ == '__main__':
     sampler = Sampler()
     dataset = Dataset(type='train', Sampler=sampler, transforms=None)
     print(dataset.__len__())
-    print(dataset.__getitem__(0))
+    img_array = dataset.__getitem__(0)[0]
+    print(img_array)
     trainloader = DataLoader(dataset, batch_size=5, shuffle=True, num_workers=0)
     for i, data in enumerate(trainloader):  # inner loop within one epoch
         input, label = data

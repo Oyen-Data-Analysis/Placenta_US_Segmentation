@@ -14,6 +14,16 @@ def auto_pad(x1, x2):
 
     return x1
 
+    # diff_height = x2.shape[2] - x1.shape[2]
+    # diff_width = x2.shape[3] - x1.shape[3]
+
+    # padding = [diff_width // 2, diff_width - diff_width // 2,
+    #            diff_height // 2, diff_height - diff_height // 2]
+    
+    # x1 = F.pad(x1, padding, "reflect")
+    # return x1
+
+
 
 class ConvBlock(nn.Module):
 
@@ -156,11 +166,12 @@ class AttentionUNet(nn.Module):
         d5 = self.Up5(e5)
         d5 = auto_pad(d5, e4)
         s4 = self.Att5(gate=d5, skip_connection=e4)
-        # s4 = auto_pad(s4, d5)
+        s4 = auto_pad(s4, d5)
         d5 = torch.cat((s4, d5), dim=1) # concatenate attention-weighted skip connection with previous layer output
         d5 = self.UpConv5(d5)
 
         d4 = self.Up4(d5)
+        d4 = auto_pad(d4, e3)
         s3 = self.Att4(gate=d4, skip_connection=e3)
         s3 = auto_pad(s3, d4)
         d4 = torch.cat((s3, d4), dim=1)

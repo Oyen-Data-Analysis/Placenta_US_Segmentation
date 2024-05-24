@@ -9,7 +9,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 from dataset.placenta_us_dataset import Dataset, DataLoader, Sampler
 
-batch_size = 10
+batch_size = 5
 epochs = 5
 optimizers = ['adam', 'rmsprop', 'adagrad']
 # dataloaders = load_data()

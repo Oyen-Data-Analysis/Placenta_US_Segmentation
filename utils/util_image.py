@@ -15,22 +15,19 @@ def to_tiff(x, path, is_normalized=True):
 
   print(x.shape, path)
 
-  if len(x.shape) == 3:
-    # n_slice, n_x, n_y = x.shape
-    n_x, n_y, n_slice = x.shape
-
+  if len(x.shape) == 2:
+    n_x, n_y = x.shape
     if is_normalized:
-      for i in range(n_slice):
-        x[:, :, i] -= np.amin(x[:, :, i])
-        x[:, :, i] /= np.amax(x[:, :, i])
-        #
-        x[:, :, i] *= 255
+      x -= np.amin(x)
+      x /= np.amax(x)
+      x *= 255
 
       x = x.astype(np.uint8)
-      # x = x.astype(np.float32)
+  else:
+    print("Fuck you")
+    return
   x = x.astype(np.float32)
-  tiff.imwrite(path, x, imagej=True, ijmetadata={'Slice': n_slice})
-
+  tiff.imwrite(path, x, imagej=True)
 
 def center_crop(data: torch.Tensor, shape: Tuple[int, int]) -> torch.Tensor:
   """

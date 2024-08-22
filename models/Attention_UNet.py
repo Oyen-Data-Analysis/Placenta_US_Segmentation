@@ -109,7 +109,7 @@ class AttentionBlock(nn.Module):
 
 class AttentionUNet(nn.Module):
 
-    def __init__(self, img_ch=1, output_ch=1):
+    def __init__(self, img_ch=1, output_ch=1, debug=False):
         super(AttentionUNet, self).__init__()
 
         self.MaxPool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -137,6 +137,7 @@ class AttentionUNet(nn.Module):
         self.UpConv2 = ConvBlock(128, 64)
 
         self.Conv = nn.Conv2d(64, output_ch, kernel_size=1, stride=1, padding=0)
+        self.debug = debug
 
         # self.finalConv = nn.Conv2d(in_channels=1,
         #        out_channels=1, kernel_size=1, stride=1,
@@ -149,47 +150,126 @@ class AttentionUNet(nn.Module):
         d : decoder layers
         s : skip-connections from encoder layers to decoder layers
         """
+        if self.debug:
+            print("forward pass")
+            print("-" * 10)
+            print("Input: ", x.shape)
         e1 = self.Conv1(x)
+        if self.debug:
+            print("e1 (Conv1): ", e1.shape)
+            print("-" * 10)
 
         e2 = self.MaxPool(e1)
+        if self.debug:
+            print("e2 (MaxPool): ", e2.shape)
         e2 = self.Conv2(e2)
+        if self.debug:
+            print("e2 (Conv2): ", e2.shape)
+            print("-" * 10)
 
         e3 = self.MaxPool(e2)
+        if self.debug:
+            print("e3 (MaxPool): ", e3.shape)
         e3 = self.Conv3(e3)
+        if self.debug:
+            print("e3 (Conv3): ", e3.shape)
+            print("-" * 10)
 
         e4 = self.MaxPool(e3)
+        if self.debug:
+            print("e4 (MaxPool): ", e4.shape)
         e4 = self.Conv4(e4)
+        if self.debug:
+            print("e4 (Conv4): ", e4.shape)
+            print("-" * 10)
 
         e5 = self.MaxPool(e4)
+        if self.debug:
+            print("e5 (MaxPool): ", e5.shape)
         e5 = self.Conv5(e5)
+        if self.debug:
+            print("e5 (Conv5): ", e5.shape)
+            print("-" * 10)
 
         d5 = self.Up5(e5)
+        if self.debug:
+            print("d5 (Up5): ", d5.shape)
         d5 = auto_pad(d5, e4)
+        if self.debug:
+            print("d5 (auto_pad): ", d5.shape)
         s4 = self.Att5(gate=d5, skip_connection=e4)
+        if self.debug:
+            print("s4 (Att5): ", s4.shape)
         s4 = auto_pad(s4, d5)
+        if self.debug:
+            print("s4 (auto_pad): ", s4.shape)
         d5 = torch.cat((s4, d5), dim=1) # concatenate attention-weighted skip connection with previous layer output
+        if self.debug:
+            print("d5 (concat): ", d5.shape)
         d5 = self.UpConv5(d5)
+        if self.debug:
+            print("d5 (UpConv5): ", d5.shape)
+            print("-" * 10)
 
         d4 = self.Up4(d5)
+        if self.debug:
+            print("d4 (Up4): ", d4.shape)
         d4 = auto_pad(d4, e3)
+        if self.debug:
+            print("d4 (auto_pad): ", d4.shape)
         s3 = self.Att4(gate=d4, skip_connection=e3)
+        if self.debug:
+            print("s3 (Att4): ", s3.shape)
         s3 = auto_pad(s3, d4)
+        if self.debug:
+            print("s3 (Att4): ", s3.shape)
         d4 = torch.cat((s3, d4), dim=1)
+        if self.debug:
+            print("d4 (concat): ", d4.shape)
         d4 = self.UpConv4(d4)
+        if self.debug:
+            print("d4 (UpConv4): ", d4.shape)
+            print("-" * 10)
 
         d3 = self.Up3(d4)
+        if self.debug:
+            print("d3 (Up3): ", d3.shape)
         s2 = self.Att3(gate=d3, skip_connection=e2)
+        if self.debug:
+            print("s2 (Att3): ", s2.shape)
         s2 = auto_pad(s2, d3)
+        if self.debug:
+            print("s2 (auto_pad): ", s2.shape)
         d3 = torch.cat((s2, d3), dim=1)
+        if self.debug:
+            print("d3 (concat): ", d3.shape)
         d3 = self.UpConv3(d3)
+        if self.debug:
+            print("d3 (UpConv3): ", d3.shape)
+            print("-" * 10)
 
         d2 = self.Up2(d3)
+        if self.debug:
+            print("d2 (Up2): ", d2.shape)
         s1 = self.Att2(gate=d2, skip_connection=e1)
+        if self.debug:
+            print("s1 (Att2): ", s1.shape)
         s1 = auto_pad(s1, d2)
+        if self.debug:
+            print("s1 (auto_pad): ", s1.shape)
         d2 = torch.cat((s1, d2), dim=1)
+        if self.debug:    
+            print("d2 (concat): ", d2.shape)
         d2 = self.UpConv2(d2)
+        if self.debug:
+            print("d2 (UpConv2): ", d2.shape)
+            print("-" * 10)
 
         out = self.Conv(d2)
+        if self.debug:
+            print("Output: ", out.shape)
+            print("-" * 10)
+            print("\n")
         # out = self.finalConv(out)
         # out = self.softmax(out)
 

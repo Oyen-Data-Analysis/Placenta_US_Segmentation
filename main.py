@@ -9,27 +9,33 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 from dataset.placenta_us_dataset import Dataset, DataLoader, Sampler
 
-batch_size = 5
+batch_size = 2
+val_test_batch_size = 1
 epochs = 5
 optimizers = ['adam', 'rmsprop', 'adagrad']
 # dataloaders = load_data()
 
 sampler = Sampler()
 dataset = Dataset(type='train', Sampler=sampler, transforms=None)
-dataloaders = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=0)
+dataloaders = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+print(len(dataloaders.dataset.data_input))
+
 
 test_dataset = Dataset(type='test', Sampler=sampler, transforms=None)
-test_dataloader = DataLoader(test_dataset, batch_size=10, shuffle=False, num_workers=0)
+test_dataloader = DataLoader(test_dataset, batch_size=val_test_batch_size, shuffle=False, num_workers=0)
+print(len(test_dataloader.dataset.data_input))
+
 
 val_dataset = Dataset(type='val', Sampler=sampler, transforms=None)
-val_dataloader = DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=0)
+val_dataloader = DataLoader(val_dataset, batch_size=val_test_batch_size, shuffle=False, num_workers=0)
+print(len(val_dataloader.dataset.data_input))
 
 def train(optim):
     model = AttentionUNet()
     if optim == 'rmsprop':
         optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-5)
-    elif optim == 'adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
+    # elif optim == 'adam':
+    #     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     elif optim == 'adagrad':
         optimizer = torch.optim.Adagrad(model.parameters(), lr=1e-5)
     criterion = FocalLoss()
@@ -63,4 +69,3 @@ if __name__ == '__main__':
     ### test the trained model ###
     dice_loss = test(model_path=save_root + '/unet_seg_best.pth') 
     print('dice_loss: {:.4f}'.format(dice_loss)) 
- 

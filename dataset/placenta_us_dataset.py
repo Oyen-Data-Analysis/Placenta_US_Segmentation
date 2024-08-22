@@ -1,8 +1,5 @@
-# import h5py
 import numpy as np
-# from glob import glob
 import pydicom
-# from tqdm import tqdm
 import os
 import SimpleITK as sitk
 import torch
@@ -11,11 +8,15 @@ from torch.utils.data import DataLoader, Dataset
 # from torch.utils.data.distributed import DistributedSampler
 import random
 # from utils.util_image import *
+
 # import config # use this import if running placenta_us_dataset.py
 # from patient import Patient
 from dataset.patient import Patient # use this import if running main.py
 import dataset.config as config
 
+# Patient1 = Patient('104-1', os.path.join(config.FGR_PATH, 'export1/project/Dataset/Placenta_OCT/FGR/104-1'))
+# visit = ['104-1/Visit 2/IMG_20230727_1_30.mha']
+# Patient1.add_visit(visit)
 
 PATIENT2FILE_MAP = {}
 
@@ -26,10 +27,14 @@ def load_us_dataset(
         # root_path: str = '/export1/project/Dataset/Placenta_OCT/',
         verbose: bool = False):
     
+    # scan_file_list = ["C:\\Users\\DRACula\\Box\\In Utero Wellcome Leap Project\\FGR Study Ultrasound Data\\Placenta Data\\Analysis\\FGR_Patients_Segmented/104-1/Visit 2/IMG_20230727_1_30.dcm",
+    #                   "C:\\Users\\DRACula\\Box\\In Utero Wellcome Leap Project\\FGR Study Ultrasound Data\\Placenta Data\\Analysis\\Control_Patients_Segmented/114-1/Visit 2/IMG_20230811_1_34.dcm"]
+    # segmented_file_list = ["C:\\Users\\DRACula\\Box\\In Utero Wellcome Leap Project\\FGR Study Ultrasound Data\\Placenta Data\\Analysis\\FGR_Patients_Segmented/104-1/Visit 2/IMG_20230727_1_30.mha",
+    #                        "C:\\Users\\DRACula\\Box\\In Utero Wellcome Leap Project\\FGR Study Ultrasound Data\\Placenta Data\\Analysis\\Control_Patients_Segmented/114-1/Visit 2/IMG_20230811_1_34.mha"]
     scan_file_list = []
     segmented_file_list = []
     if verbose:
-        print("RUNNING load_oct_dataset ...")
+        print("RUNNING load_us_dataset ...")
         print("========================================================")
     for path in SEGMENTATION_PATH.values():
         dir_list = os.listdir(path)
@@ -46,12 +51,6 @@ def load_us_dataset(
                             scan_file_list.append(path + '/' + shared_path + '.dcm')
                             segmented_file_list.append(path + '/' + shared_path + '.mha')
                 PATIENT2FILE_MAP[patient_dir_path].add_visit(visit)
-    
-    # for index in indexes:
-    #     file_id = INDEX2FILE_MAP[index]
-    #     file_name = root_path + file_id + '.tif'
-    #     print(file_name)
-    #     file_list.append(file_name)
 
     if verbose:
         visit_indent = 5
@@ -104,6 +103,14 @@ class Sampler:
     
     def get_test(self):
         return [self.data_input[i] for i in self.test], [self.data_labels[i] for i in self.test]
+    
+    def get_debug(self):
+        arr1 = [os.path.join(config.FGR_PATH, '139-1/Visit 2/IMG_20231027_1_52.dcm'), os.path.join(config.FGR_PATH, '132-1/Visit 2/IMG_20231023_1_58.dcm'), os.path.join(config.FGR_PATH, '136-1/Visit 2/IMG_20231019_2_41.dcm')]
+        arr2 = [os.path.join(config.FGR_PATH, '139-1/Visit 2/IMG_20231027_1_52.mha'), os.path.join(config.FGR_PATH, '132-1/Visit 2/IMG_20231023_1_58.mha'), os.path.join(config.FGR_PATH, '136-1/Visit 2/IMG_20231019_2_41.mha')]
+        return arr1, arr2
+    
+    def get_all(self):
+        return self.data_input, self.data_labels
 
 class Dataset:
     def __init__(
@@ -117,19 +124,8 @@ class Dataset:
 
         self.sampler=Sampler
         self.type = type
-        self.data_input, self.data_labels = self.sampler.get_train() if self.type == 'train' else self.sampler.get_val() if self.type == 'val' else self.sampler.get_test()        
-
-        # 3D Data
-        # for index_subject in self.data_input:
-        #     for index_z in range(
-        #             0, 0
-        #                + 100, 1
-        #     ):
-        #         self.indexes_map.append([index_subject, index_z])
-
-        # for index_subject in self.data_input:
-        #     self.indexes_map.append(index_subject)
-
+        self.data_input, self.data_labels = self.sampler.get_train() if self.type == 'train' else self.sampler.get_val() if self.type == 'val' else self.sampler.get_test() if self.type == 'test' else self.sampler.get_debug()      
+        # self.data_input, self.data_labels = self.sampler.get_all() if self.type == 'train' else ([], [])
 
     def __len__(self):
 
@@ -197,7 +193,7 @@ class Dataset:
 def read_dicom_image(path):
     """Reads and returns a DICOM image as a numpy array."""
     dicom_image = pydicom.dcmread(path)
-    image_array = dicom_image.pixel_array.astype(float)
+    image_array = dicom_image.pixel_array
     image_array = (np.maximum(image_array, 0) / image_array.max()) * 255.0  # Normalize
     image_array = np.uint8(image_array)
     return image_array
@@ -205,9 +201,13 @@ def read_dicom_image(path):
 def read_mha_image(path):
     """Reads and returns an MHA image as a numpy array."""
     itk_image = sitk.ReadImage(path)
+    print("reading mask from ", path, " Size: ", itk_image.GetSize())
     image_array = sitk.GetArrayFromImage(itk_image)
     image_array = np.squeeze(image_array)  # Remove singleton dimensions if any
-    return image_array
+    if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+        image_array = image_array[:, :, 0]
+        print("3 Channels. Taking first. Shape is now: ", image_array.shape)
+    return np.uint8(image_array)
 
 if __name__ == '__main__':
     # a, b = load_us_dataset(verbose=True)

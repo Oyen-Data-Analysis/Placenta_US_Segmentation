@@ -21,7 +21,7 @@ from torchvision.utils import make_grid
 from torch.nn import functional as F
 
 
-def train_unet(model, dataloaders, optimizer, criterion, num_epochs=3):
+def train_unet(model, dataloaders, optimizer, criterion, num_epochs=1):
     since = time.time()
     # Use gpu if available
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")

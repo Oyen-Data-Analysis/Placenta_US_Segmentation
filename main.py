@@ -4,7 +4,7 @@ from torchvision.utils import make_grid
 from train.train_attention_unet import train_unet
 from test.test_attention_unet import test_unet
 
-from utils.util_losses import dice_coeff, FocalLoss
+from utils.util_losses import DiceLoss, FocalLoss
 import torch.nn as nn
 import matplotlib.pyplot as plt
 from dataset.placenta_us_dataset import Dataset, DataLoader, Sampler
@@ -31,9 +31,11 @@ def train(optim):
 def test(model_path):
     model = AttentionUNet()
     criterion = FocalLoss()
-    dice_loss = test_unet(model, test_dataloader, criterion, model_path)
+    focal = test_unet(model, test_dataloader, criterion, model_path)
+    criterion = DiceLoss()
+    dice = test_unet(model, test_dataloader, criterion, model_path)
 
-    return dice_loss
+    return focal, dice
 
 batch_size = 2
 val_test_batch_size = 1
@@ -62,18 +64,19 @@ if __name__ == '__main__':
     models = []
     val_loss = []
     save_root = './model_zoo'
-    for optim in optimizers:
+    for i, optim in enumerate(optimizers):
         trained_model = train(optim)[0]
         models.append(trained_model)        
         torch.save(trained_model.state_dict(), "{0}/unet_seg_{1}.pth".format(save_root, optim))
         val_loss.append(test_unet(trained_model, val_dataloader, FocalLoss(), "{0}/unet_seg_{1}.pth".format(save_root, optim)))
-        print('Validation loss for {0}: {1}'.format(optim, val_loss))
+        print('Validation loss for {0}: {1}'.format(optim, val_loss[i]))
     best_model_idx = val_loss.index(min(val_loss))
     best_model = models[best_model_idx]
     best_optim = optimizers[best_model_idx]
     torch.save(best_model.state_dict(), "{0}/unet_seg_best_{1}.pth".format(save_root, best_optim))
 
     ### test the trained model ###
-    dice_loss = test(model_path=save_root + '/unet_seg_best_{0}.pth'.format(best_optim))
+    focal_loss, dice_loss = test(model_path=save_root + '/unet_seg_best_{0}.pth'.format(best_optim))
+    print('focal_loss: {:.4f}'.format(focal_loss))
     print('dice_loss: {:.4f}'.format(dice_loss))
     print('used {0} optimizer'.format(best_optim))

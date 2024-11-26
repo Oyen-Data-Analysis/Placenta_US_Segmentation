@@ -46,3 +46,14 @@ class FocalLoss(nn.modules.loss._WeightedLoss):
         focal_loss = -((1 - pt) ** self.gamma) * logpt
         balanced_focal_loss = self.balance_param * focal_loss
         return balanced_focal_loss
+
+class DiceLoss(nn.Module):
+    def __init__(self):
+        super(DiceLoss, self).__init__()
+    def forward(self, preds, targets, smooth=0):
+        preds = torch.sigmoid(preds)  # Apply sigmoid to get values between 0 and 1
+        preds = preds.view(-1)
+        targets = targets.view(-1)
+        intersection = (preds * targets).sum()
+        dice = (2. * intersection + smooth) / (preds.sum() + targets.sum() + smooth)
+        return dice

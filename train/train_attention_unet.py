@@ -1,5 +1,7 @@
 import copy
 import time
+
+import math
 import torch
 import numpy as np
 import os
@@ -24,16 +26,16 @@ from torch.nn import functional as F
 def train_unet(model, dataloaders, optimizer, criterion, num_epochs=1):
     since = time.time()
     # Use gpu if available
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    model.to(device)
 
     train_epoch_losses = []
     for epoch in range(1, num_epochs + 1):
-
-        print(f'Epoch {epoch}/{num_epochs}')
-        print('-' * 10)
         # Initialize batch summary
+        print('-' * 10)
+        print(f'Epoch {epoch}/{num_epochs}')
         batch_train_loss = 0.0
+
+        device = torch.device("cuda:1")
+        model.to(device)
 
         model.train()
 
@@ -42,7 +44,9 @@ def train_unet(model, dataloaders, optimizer, criterion, num_epochs=1):
             input, label = data
 
             inputs = input.float().to(device)
+            # print("input sent to device ", inputs.device)
             label = label.float().to(device)
+            # print("label sent to device ", label.device)
             # zero the parameter gradients
             optimizer.zero_grad()
 
@@ -58,6 +62,17 @@ def train_unet(model, dataloaders, optimizer, criterion, num_epochs=1):
             # accumulate batch loss
             batch_train_loss += loss.item() * input.size(0)
 
+            # if i % 5 == 0:
+            #     print(next(model.parameters()))
+            # if math.isnan(batch_train_loss):
+            #     print("loss.item() is {:.4f}".format(loss.item()))
+            #     print("input size is {}".format(input.size(0)))
+            #     print("outputs are ")
+            #     print(outputs)
+            #     print("labels are ")
+            #     print(label)
+            #
+            # print(batch_train_loss)
         # save epoch losses
         epoch_train_loss = batch_train_loss / len(dataloaders)
         train_epoch_losses.append(epoch_train_loss)

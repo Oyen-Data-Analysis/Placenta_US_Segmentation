@@ -7,20 +7,19 @@ import cv2
 from torch.utils.data import DataLoader, Dataset
 # from torch.utils.data.distributed import DistributedSampler
 import random
-# from utils.util_image import *
+from utils.util_image import *
+import matplotlib.pyplot as plt
 
 # import config # use this import if running placenta_us_dataset.py
-# from patient import Patient
-from dataset.patient import Patient # use this import if running main.py
 import dataset.config as config
+from utils.util_image import center_crop
 
 # Patient1 = Patient('104-1', os.path.join(config.FGR_PATH, 'export1/project/Dataset/Placenta_OCT/FGR/104-1'))
 # visit = ['104-1/Visit 2/IMG_20230727_1_30.mha']
 # Patient1.add_visit(visit)
 
-PATIENT2FILE_MAP = {}
-
 SEGMENTATION_PATH = {'FGR': config.FGR_PATH, 'Controlled': config.CONTROLLED_PATH}
+MASK_PATH = config.MASK_PATH
 
 def load_us_dataset(
         # indexes,
@@ -37,42 +36,18 @@ def load_us_dataset(
         print("RUNNING load_us_dataset ...")
         print("========================================================")
     for path in SEGMENTATION_PATH.values():
-        dir_list = os.listdir(path)
-        for patient_dir_path in dir_list: # dir_path is id
-            PATIENT2FILE_MAP[patient_dir_path] = Patient(patient_dir_path, path + '/' + patient_dir_path)
-            for visit_dir_path in os.listdir(path + '/' + patient_dir_path):
-                visit = []
-                for file in os.listdir(path + '/' + patient_dir_path + '/' + visit_dir_path):
-                    if file.endswith(".dcm"):
-                        scan_id = file.rstrip('.dcm')
-                        if os.path.exists(path + '/' + patient_dir_path + '/' + visit_dir_path + '/' + scan_id + '.mha'):
-                            shared_path = patient_dir_path + '/' + visit_dir_path + '/' + scan_id # Append this path to one of the paths in SEGENMENTATION_PATH and append with '.dcm' or '.mha' to get the original/segmented image
-                            visit.append(shared_path)
-                            scan_file_list.append(path + '/' + shared_path + '.dcm')
-                            segmented_file_list.append(path + '/' + shared_path + '.mha')
-                PATIENT2FILE_MAP[patient_dir_path].add_visit(visit)
+        for root, dirs, files in os.walk(path):
+            for f in files:
+                if f.endswith(".dcm"):
+                    f = root + "/" + f
+                    if MASK_PATH == '':
+                        mask_path = f.replace(".dcm", ".mha")
+                    else:
+                        mask_path = MASK_PATH + '/' + os.path.basename(f).replace('.dcm', '_segmented.jpg')
+                    if os.path.exists(mask_path):
+                        scan_file_list.append(f)
+                        segmented_file_list.append(mask_path)
 
-    if verbose:
-        visit_indent = 5
-        file_indent = 5
-
-        print("returning read file structure ...")
-        print("========================================================")
-
-        for idx, (patient_id, patient) in enumerate(PATIENT2FILE_MAP.items()):
-            print(f'Patient {idx + 1}: {patient_id}')
-            for visit_idx, visit in enumerate(patient.visits):
-                print('-' * visit_indent + f'Visit {visit_idx + 1}')
-                for file in visit:
-                    print(' ' * (visit_indent - 3) + '-' * file_indent + file)
-        print("========================================================")
-        print('\n')
-        print('returning files lists ...')
-        print("========================================================")
-        for idx, scan in enumerate(scan_file_list):
-            print(f'Scan {idx + 1}: {scan}')
-            print(f'Segmented {idx + 1}: {segmented_file_list[idx]}')
-            print("------------------------------------------------------------")
     return scan_file_list, segmented_file_list
 
 class Sampler:
@@ -135,16 +110,31 @@ class Dataset:
         # index_subject, index_z = self.indexes_map[item]
         index_subject = self.data_input[item]
         img_input = read_dicom_image(index_subject)
+
+        # Convert Input to Grayscale and reshape
         img_input = cv2.cvtColor(img_input, cv2.COLOR_BGR2GRAY)
         img_input = img_input.reshape(1, img_input.shape[0], img_input.shape[1])
+
+
         index_subject_label = self.data_labels[item]
-        img_label = read_mha_image(index_subject_label)
+        if index_subject_label.endswith('.mha'):
+            img_label = read_mha_image(index_subject_label)
+            cnts = cv2.findContours(img_label, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+
+            for c in cnts:
+                cv2.drawContours(img_label, [c], 0, (255, 255, 255), -1)
+        else:
+            img_label = cv2.imread(index_subject_label, cv2.IMREAD_GRAYSCALE)
+
         img_label = img_label.reshape(1, img_label.shape[0], img_label.shape[1])
 
-        # img_input = np.expand_dims(center_crop(img_input, [248, 248]), axis=0)
-        # img_label = np.expand_dims(center_crop(img_label, [248, 248]), axis=0)
+        img_label = np.where(img_label > 0, 1, 0)
 
-        # img_input = normlize(img_input)
+        img_input = center_crop(img_input, [600, 600])
+        img_label = center_crop(img_label, [600, 600])
+
+        img_input = cv2.normalize(img_input, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
 
         return img_input, img_label
     
@@ -201,7 +191,6 @@ def read_dicom_image(path):
 def read_mha_image(path):
     """Reads and returns an MHA image as a numpy array."""
     itk_image = sitk.ReadImage(path)
-    print("reading mask from ", path, " Size: ", itk_image.GetSize())
     image_array = sitk.GetArrayFromImage(itk_image)
     image_array = np.squeeze(image_array)  # Remove singleton dimensions if any
     if len(image_array.shape) == 3 and image_array.shape[2] == 3:
@@ -223,10 +212,12 @@ if __name__ == '__main__':
     dataset = Dataset(type='train', Sampler=sampler, transforms=None)
     print(dataset.__len__())
     img_array = dataset.__getitem__(0)[0]
+    if np.all(img_array == 0):
+        print("Image is all zeros")
     print(img_array)
     trainloader = DataLoader(dataset, batch_size=5, shuffle=True, num_workers=0)
-    for i, data in enumerate(trainloader):  # inner loop within one epoch
-        input, label = data
-        print(input.shape)
-        print(label.shape)
-        print(i)
+    # for i, data in enumerate(trainloader):  # inner loop within one epoch
+    #     input, label = data
+    #     print(input.shape)
+    #     print(label.shape)
+    #     print(i)
